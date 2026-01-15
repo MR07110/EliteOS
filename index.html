@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>Elite OS - Minimal Gray</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200;400;600;800&display=swap');
+        
+        :root {
+            --primary: #6366f1;
+            --danger: #ff4757;
+            --gray: #64748b;
+            --bg: #030406;
+            --card-bg: rgba(255, 255, 255, 0.02);
+            --border: rgba(255, 255, 255, 0.08);
+            --btn-gray: rgba(255, 255, 255, 0.05);
+            --transit: all 0.3s ease;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: #f8fafc; min-height: 100vh; overflow: hidden; touch-action: none; }
+
+        /* --- MONITOR PAGE --- */
+        #show-page { display: none; width: 100vw; height: 100vh; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+        .nano-header { position: absolute; top: 5vh; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 20; }
+        .clock-box { font-size: clamp(1.2rem, 5vw, 2rem); font-weight: 200; letter-spacing: 4px; opacity: 0.7; }
+        .micro-status { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--card-bg); border: 1px solid var(--border); font-size: 0.9rem; }
+        .zoom-wrapper { display: flex; justify-content: center; align-items: center; width: 100%; transition: transform 0.1s ease-out; transform-origin: center; }
+        #m-text { font-size: clamp(2rem, 8vw, 7.5vw); font-weight: 800; white-space: nowrap; display: inline-block; padding: 0 50px; }
+        .marquee { animation: scroll-normal var(--speed, 15s) linear infinite; }
+        @keyframes scroll-normal { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
+
+        /* --- ADMIN PANEL --- */
+        #admin-page { display: none; padding: 20px; max-width: 800px; margin: 0 auto; height: 100vh; overflow-y: auto; }
+        .nav-pills { display: flex; justify-content: center; gap: 8px; position: sticky; top: 0; background: var(--bg); padding: 15px 0; z-index: 10; }
+        
+        /* Gray Simple Pills */
+        .pill { 
+            padding: 10px 18px; border-radius: 12px; border: 1px solid var(--border); 
+            background: var(--btn-gray); color: var(--gray); cursor: pointer; 
+            font-size: 0.8rem; font-weight: 600; transition: var(--transit); 
+            display: flex; align-items: center; gap: 8px; 
+        }
+        .pill.active { background: white; color: black; border-color: white; }
+
+        .glass-card { background: var(--card-bg); border: 1px solid var(--border); padding: 24px; border-radius: 24px; margin-bottom: 20px; }
+        input, select, textarea { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 14px; color: white; border-radius: 14px; margin-bottom: 10px; font-size: 0.9rem; }
+        
+        /* Gray Simple Buttons */
+        .btn-action { 
+            width: 100%; padding: 16px; border-radius: 14px; border: 1px solid var(--border); 
+            background: var(--btn-gray); color: #cbd5e1; font-weight: 600; cursor: pointer; 
+            transition: var(--transit); display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 0.9rem;
+        }
+        .btn-action:hover { background: rgba(255,255,255,0.1); color: white; }
+        .btn-action:active { transform: scale(0.98); }
+        .btn-sos-toggle { border-color: rgba(255, 71, 87, 0.3); color: var(--danger); }
+
+        .history-box { margin-top: 20px; max-height: 250px; overflow-y: auto; }
+        .history-item { padding: 12px; border-radius: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); border: 1px solid var(--border); font-size: 0.8rem; }
+        .del-icon { color: var(--gray); cursor: pointer; transition: 0.2s; }
+        .del-icon:hover { color: var(--danger); }
+
+        /* MODE SELECTOR */
+        #mode-selector { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; flex-direction: column; z-index: 1000; }
+        .selector-btn { 
+            width: 280px; padding: 20px; margin: 10px; border-radius: 20px; border: 1px solid var(--border); 
+            background: var(--btn-gray); color: white; cursor: pointer; font-weight: 600; 
+            transition: var(--transit); display: flex; align-items: center; justify-content: center; gap: 12px;
+        }
+        .selector-btn:hover { background: white; color: black; }
+
+        .fa-spin-slow { animation: fa-spin 4s infinite linear; }
+    </style>
+</head>
+<body>
+
+<div id="mode-selector">
+    <h1 style="font-weight: 200; letter-spacing: 8px; margin-bottom: 40px;">ELITE<span style="color:var(--primary); font-weight: 800;">OS</span></h1>
+    <button class="selector-btn" onclick="checkAdmin()">
+        <i class="fas fa-shield-halved"></i> ADMIN CONTROL
+    </button>
+    <button class="selector-btn" onclick="selectMode('show')">
+        <i class="fas fa-display"></i> VIEW MONITOR
+    </button>
+</div>
+
+<div id="admin-page">
+    <div class="nav-pills">
+        <div class="pill active" onclick="switchTab('weekly', this)"><i class="fas fa-calendar-days"></i> JADVAL</div>
+        <div class="pill" onclick="switchTab('daily', this)"><i class="fas fa-bullhorn"></i> E'LON</div>
+        <div class="pill" onclick="switchTab('sos', this)"><i class="fas fa-triangle-exclamation"></i> SOS</div>
+    </div>
+    
+    <div id="weekly-tab" class="glass-card tab-content">
+        <select id="w-day">
+            <option value="1">Dushanba</option><option value="2">Seshanba</option><option value="3">Chorshanba</option>
+            <option value="4">Payshanba</option><option value="5">Juma</option><option value="6">Shanba</option>
+        </select>
+        <div style="display:flex; gap:10px;"><input type="time" id="w-start"> <input type="time" id="w-end"></div>
+        <input type="text" id="w-msg" placeholder="Dars yoki tanaffus matni">
+        <button class="btn-action" onclick="saveData('weekly')">
+            <i class="fas fa-plus-circle"></i> JADVALGA QO'SHISH
+        </button>
+        <div class="history-box" id="list-weekly"></div>
+    </div>
+
+    <div id="daily-tab" class="glass-card tab-content" style="display:none">
+        <input type="date" id="d-date">
+        <div style="display:flex; gap:10px;"><input type="time" id="d-start"> <input type="time" id="d-end"></div>
+        <textarea id="d-msg" placeholder="E'lon matnini yozing..." rows="3"></textarea>
+        <button class="btn-action" onclick="saveData('daily')">
+            <i class="fas fa-paper-plane"></i> E'LONNI CHIQARISH
+        </button>
+        <div class="history-box" id="list-daily"></div>
+    </div>
+
+    <div id="sos-tab" class="glass-card tab-content" style="display:none">
+        <div id="admin-sos-timer" style="text-align:center; font-size: 2rem; font-weight: 800; color: var(--danger); margin-bottom: 15px;">00:00</div>
+        <textarea id="e-msg" placeholder="SOS xabari (Masalan: EVAKUATSIYA!)" rows="2"></textarea>
+        <button class="btn-action btn-sos-toggle" onclick="sosAction(true)">
+            <i class="fas fa-radiation"></i> SOSNI YOQISH
+        </button>
+        <button class="btn-action" style="margin-top:10px" onclick="sosAction(false)">
+            <i class="fas fa-circle-xmark"></i> SOSNI TO'XTATISH
+        </button>
+        <div class="history-box" id="list-sos"></div>
+    </div>
+</div>
+
+<div id="show-page">
+    <div class="nano-header">
+        <div class="clock-box" id="clock">00:00:00</div>
+        <div class="micro-status" id="status-circle"><i id="status-icon" class="fas fa-circle"></i></div>
+    </div>
+    <div class="zoom-wrapper" id="zoom-cont">
+        <div id="m-text">TIZIM TAYYOR...</div>
+    </div>
+</div>
+
+<script>
+    // JS mantiqiy qismi o'zgarmadi, faqat iconli tugmalar uchun funksionallik saqlandi
+    const firebaseConfig = {
+        apiKey: "AIzaSyCn5tv-SPX9wDy6ZWTiq3eDFGLSV4oCgdE",
+        authDomain: "monitorelon-cbaba.firebaseapp.com",
+        databaseURL: "https://monitorelon-cbaba-default-rtdb.firebaseio.com",
+        projectId: "monitorelon-cbaba",
+        storageBucket: "monitorelon-cbaba.firebasestorage.app",
+        messagingSenderId: "433185645641",
+        appId: "1:433185645641:web:eac6cf0bf36b61b5758b98"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let weeklyData = {}, dailyData = {}, emData = {active: false}, sosHistory = {};
+    let currentMsg = "";
+    let currentScale = 1;
+    let initialDist = 0;
+    const zoomCont = document.getElementById('zoom-cont');
+
+    // Zoom Logic
+    document.getElementById('show-page').addEventListener('touchstart', e => {
+        if (e.touches.length === 2) initialDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+    });
+    document.getElementById('show-page').addEventListener('touchmove', e => {
+        if (e.touches.length === 2 && initialDist > 0) {
+            let dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            let zoom = dist / initialDist;
+            let newScale = Math.min(Math.max(0.5, currentScale * zoom), 5);
+            zoomCont.style.transform = `scale(${newScale})`;
+        }
+    });
+    document.getElementById('show-page').addEventListener('touchend', e => {
+        if (e.touches.length < 2) {
+            let style = window.getComputedStyle(zoomCont);
+            let matrix = new WebKitCSSMatrix(style.transform);
+            currentScale = matrix.a;
+            initialDist = 0;
+        }
+    });
+
+    db.ref('system').on('value', snap => {
+        const val = snap.val() || {};
+        weeklyData = val.weekly || {};
+        dailyData = val.daily || {};
+        emData = val.emergency || {active: false};
+        sosHistory = val.sos_history || {};
+        renderLists();
+    });
+
+    function tToM(t) { if(!t) return -1; const [h, m] = t.split(':').map(Number); return h * 60 + m; }
+
+    function updateLogic() {
+        const now = new Date();
+        const curMin = now.getHours() * 60 + now.getMinutes();
+        const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const weekDay = now.getDay();
+        document.getElementById('clock').innerText = now.toLocaleTimeString('uz-UZ', {hour12:false});
+
+        let msg = "Hikmat: Ilm — najot yo'lidir.", icon = "fa-circle", color = "#1e293b", bg = "#030406";
+
+        if (weeklyData[weekDay]) {
+            Object.values(weeklyData[weekDay]).forEach(item => {
+                if (curMin >= tToM(item.start) && curMin < tToM(item.end)) { msg = item.msg; icon = "fa-clock"; color = "#6366f1"; }
+            });
+        }
+        if (dailyData) {
+            Object.values(dailyData).forEach(item => {
+                if (item.date === dateStr && curMin >= tToM(item.start) && curMin < tToM(item.end)) { msg = item.msg; icon = "fa-microphone"; color = "#a855f7"; }
+            });
+        }
+        if (emData.active) {
+            msg = emData.msg; icon = "fa-radiation fa-spin-slow"; color = "#ff4757"; bg = "radial-gradient(circle, #220505, #030406)";
+            const diff = Math.floor((Date.now() - emData.startTime) / 1000);
+            document.getElementById('admin-sos-timer').innerText = `${String(Math.floor(diff/60)).padStart(2,'0')}:${String(diff%60).padStart(2,'0')}`;
+        }
+
+        document.getElementById('show-page').style.background = bg;
+        const iconEl = document.getElementById('status-icon');
+        iconEl.className = "fas " + icon; iconEl.style.color = color;
+        document.getElementById('status-circle').style.borderColor = color + "44";
+
+        const textEl = document.getElementById('m-text');
+        if (currentMsg !== msg) {
+            textEl.style.opacity = "0";
+            setTimeout(() => {
+                textEl.innerText = msg;
+                textEl.classList.remove('marquee');
+                void textEl.offsetWidth;
+                if (textEl.scrollWidth > window.innerWidth) {
+                    textEl.style.setProperty('--speed', Math.max(10, msg.length * 0.2) + 's');
+                    textEl.classList.add('marquee');
+                    textEl.style.textAlign = "left";
+                } else { textEl.style.textAlign = "center"; }
+                textEl.style.opacity = "1";
+                currentMsg = msg;
+            }, 400);
+        }
+    }
+
+    function saveData(type) {
+        const data = type === 'weekly' ? { start: document.getElementById('w-start').value, end: document.getElementById('w-end').value, msg: document.getElementById('w-msg').value, day: document.getElementById('w-day').value } 
+        : { date: document.getElementById('d-date').value, start: document.getElementById('d-start').value, end: document.getElementById('d-end').value, msg: document.getElementById('d-msg').value };
+        if(!data.msg || !data.start) return;
+        type === 'weekly' ? db.ref(`system/weekly/${data.day}`).push(data) : db.ref('system/daily').push(data);
+    }
+
+    function sosAction(act) {
+        if(act) {
+            const m = document.getElementById('e-msg').value || "SOS";
+            db.ref('system/emergency').set({ active: true, msg: m, startTime: Date.now() });
+            db.ref('system/sos_history').push({ msg: m, time: new Date().toLocaleString() });
+        } else db.ref('system/emergency').update({ active: false });
+    }
+
+    function renderLists() {
+        let wH = "", dH = "", sH = "";
+        Object.keys(weeklyData).forEach(d => { Object.keys(weeklyData[d]).forEach(k => { wH += `<div class="history-item"><span><b>K:${d}</b> ${weeklyData[d][k].msg}</span><i class="fas fa-trash-can del-icon" onclick="db.ref('system/weekly/${d}/${k}').remove()"></i></div>`; })});
+        Object.keys(dailyData).forEach(k => { dH += `<div class="history-item"><span><b>${dailyData[k].date}</b> ${dailyData[k].msg}</span><i class="fas fa-trash-can del-icon" onclick="db.ref('system/daily/${k}').remove()"></i></div>`; });
+        Object.keys(sosHistory).reverse().slice(0, 5).forEach(k => { sH += `<div class="history-item"><span>${sosHistory[k].msg}</span><i class="fas fa-trash-can del-icon" onclick="db.ref('system/sos_history/${k}').remove()"></i></div>`; });
+        document.getElementById('list-weekly').innerHTML = wH; document.getElementById('list-daily').innerHTML = dH; document.getElementById('list-sos').innerHTML = sH;
+    }
+
+    function switchTab(tab, el) { document.querySelectorAll('.tab-content').forEach(c => c.style.display='none'); document.querySelectorAll('.pill').forEach(p => p.classList.remove('active')); document.getElementById(tab+'-tab').style.display='block'; el.classList.add('active'); }
+    function checkAdmin() { if(prompt("PIN:")==="byMR") { document.getElementById('admin-page').style.display='block'; document.getElementById('mode-selector').style.display='none'; } }
+    function selectMode(m) { document.getElementById('mode-selector').style.display='none'; document.getElementById(m+'-page').style.display='flex'; }
+    
+    setInterval(updateLogic, 1000);
+</script>
+</body>
+</html>
